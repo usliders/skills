@@ -1,142 +1,142 @@
-@echo off
-setlocal enabledelayedexpansion
-title Установщик скилов для AI-ассистентов
-chcp 65001 >nul
+#!/usr/bin/env pwsh
+# install.ps1 - Установка скилов из usliders/skills в текущий проект
 
-:: Проверяем, есть ли git
-where git >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [ОШИБКА] git не найден в системе.
-    echo Пожалуйста, установите Git для Windows: https://git-scm.com/download/win
-    echo Или установите WSL и используйте bash-скрипт.
-    pause
-    exit /b 1
+param(
+    [string]$RepoUrl = "https://github.com/usliders/skills.git",
+    [string]$Branch = "main",
+    [string]$TargetDir = "",
+    [switch]$AllSkills
 )
 
-set "REPO_URL=https://github.com/usliders/skills.git"
-set "REPO_BRANCH=main"
+# Цвета для вывода (работает в Windows Terminal / PSReadLine)
+$InfoColor = "Cyan"
+$SuccessColor = "Green"
+$WarnColor = "Yellow"
+$ErrorColor = "Red"
 
-:: Запоминаем текущую папку (где запущен скрипт)
-set "CURRENT_DIR=%CD%"
+function Write-Info   { Write-Host "[INFO] $args" -ForegroundColor $InfoColor }
+function Write-Success{ Write-Host "[OK]   $args" -ForegroundColor $SuccessColor }
+function Write-Warning{ Write-Host "[WARN] $args" -ForegroundColor $WarnColor }
+function Write-Error  { Write-Host "[ERROR] $args" -ForegroundColor $ErrorColor; exit 1 }
 
-:: Временная папка для клонирования
-set "TEMP_DIR=%TEMP%\skills-%RANDOM%"
-mkdir "%TEMP_DIR%" 2>nul
+# Проверка наличия git
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Write-Error "Git не найден в PATH. Установите Git для Windows: https://git-scm.com/download/win"
+}
 
-echo [INFO] Клонируем репозиторий %REPO_URL% (ветка %REPO_BRANCH%)...
-git clone --depth 1 --branch "%REPO_BRANCH%" "%REPO_URL%" "%TEMP_DIR%" 2>nul
-if %errorlevel% neq 0 (
-    echo [ОШИБКА] Не удалось клонировать репозиторий. Проверьте интернет.
-    rmdir /s /q "%TEMP_DIR%" 2>nul
-    pause
-    exit /b 1
-)
+# Создание временной папки
+$tempDir = Join-Path $env:TEMP "skills-$([System.IO.Path]::GetRandomFileName())"
+Write-Info "Клонируем репозиторий $RepoUrl (ветка $Branch)..."
+git clone --depth 1 --branch $Branch $RepoUrl $tempDir 2>$null
+if (-not (Test-Path (Join-Path $tempDir ".git"))) {
+    Write-Error "Не удалось клонировать репозиторий. Проверьте URL и интернет."
+}
 
-:: Определяем папку со скилами (либо корень, либо /skills)
-if exist "%TEMP_DIR%\skills" (
-    set "SKILLS_SRC=%TEMP_DIR%\skills"
-) else (
-    set "SKILLS_SRC=%TEMP_DIR%"
-)
+# Определяем папку со скилами
+$skillsSrc = if (Test-Path (Join-Path $tempDir "skills")) { Join-Path $tempDir "skills" } else { $tempDir }
 
-:: Собираем список скилов (папки с SKILL.md)
-set "SKILL_LIST="
-for /d %%d in ("%SKILLS_SRC%\*") do (
-    if exist "%%d\SKILL.md" (
-        set "SKILL_NAME=%%~nxd"
-        set "SKILL_LIST=!SKILL_LIST! !SKILL_NAME!"
-    )
-)
+# Получаем список скилов (папки с SKILL.md)
+$availableSkills = Get-ChildItem $skillsSrc -Directory | Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") } | ForEach-Object { $_.Name } | Sort-Object
+if ($availableSkills.Count -eq 0) {
+    Write-Error "В репозитории не найдено ни одного скила (SKILL.md)."
+}
 
-if "!SKILL_LIST!"=="" (
-    echo [ОШИБКА] В репозитории не найдено ни одного скила (SKILL.md).
-    rmdir /s /q "%TEMP_DIR%" 2>nul
-    pause
-    exit /b 1
-)
+Write-Info "Найдено скилов: $($availableSkills.Count)"
 
-echo.
-echo Найдены скилы:
-set /a count=0
-for %%s in (!SKILL_LIST!) do (
-    set /a count+=1
-    echo   !count!. %%s
-)
+# Интерактивный выбор AI-ассистента, если TargetDir не задан
+if ([string]::IsNullOrEmpty($TargetDir)) {
+    Write-Host ""
+    Write-Host "Выберите AI-ассистента (путь для установки скилов):" -ForegroundColor "White"
+    Write-Host "  1) Claude Code        → .claude\skills"
+    Write-Host "  2) Cursor             → .cursor\skills"
+    Write-Host "  3) Gemini CLI         → .gemini\skills"
+    Write-Host "  4) Pi                 → .pi\skills"
+    Write-Host "  5) Codex CLI          → .codex\skills"
+    Write-Host "  6) Antigravity        → .agent\skills"
+    Write-Host "  7) GitHub Copilot     → .github\skills"
+    Write-Host "  8) Windsurf Cascade   → .windsurf\skills"
+    Write-Host "  9) Augment Code       → .augment\skills"
+    Write-Host " 10) Универсальный      → .agents\skills"
+    Write-Host " 11) BoltAI             → .bolt\skills"
+    Write-Host " 12) Ручной ввод пути"
+    Write-Host " 13) Отмена"
+    $choice = Read-Host "Ваш выбор (1-13)"
 
-:: Интерактивный выбор AI-ассистента
-echo.
-echo Выберите AI-ассистента (путь для установки):
-echo   1. Claude Code        -> .claude\skills
-echo   2. Cursor             -> .cursor\skills
-echo   3. Gemini CLI         -> .gemini\skills
-echo   4. Pi                 -> .pi\skills
-echo   5. Codex CLI          -> .codex\skills
-echo   6. Antigravity        -> .agent\skills
-echo   7. GitHub Copilot     -> .github\skills
-echo   8. Windsurf           -> .windsurf\skills
-echo   9. Augment Code       -> .augment\skills
-echo   10. Универсальный      -> .agents\skills
-echo   11. BoltAI             -> .bolt\skills
-echo   12. Ручной ввод
-echo   13. Отмена
-set /p "assist_choice=Ваш выбор (1-13): "
+    switch ($choice) {
+        "1"  { $TargetDir = ".claude\skills" }
+        "2"  { $TargetDir = ".cursor\skills" }
+        "3"  { $TargetDir = ".gemini\skills" }
+        "4"  { $TargetDir = ".pi\skills" }
+        "5"  { $TargetDir = ".codex\skills" }
+        "6"  { $TargetDir = ".agent\skills" }
+        "7"  { $TargetDir = ".github\skills" }
+        "8"  { $TargetDir = ".windsurf\skills" }
+        "9"  { $TargetDir = ".augment\skills" }
+        "10" { $TargetDir = ".agents\skills" }
+        "11" { $TargetDir = ".bolt\skills" }
+        "12" { $TargetDir = Read-Host "Введите путь (например: .my-skills)" }
+        "13" { Write-Info "Установка отменена."; Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue; exit 0 }
+        default { Write-Error "Некорректный выбор" }
+    }
+}
 
-if "%assist_choice%"=="13" (
-    echo Установка отменена.
-    rmdir /s /q "%TEMP_DIR%" 2>nul
-    pause
-    exit /b 0
-)
+# Целевая папка в текущем проекте
+$fullTarget = Join-Path (Get-Location) $TargetDir
+New-Item -ItemType Directory -Path $fullTarget -Force | Out-Null
+Write-Info "Целевая папка: $fullTarget"
 
-set "TARGET_DIR="
-if "%assist_choice%"=="1" set "TARGET_DIR=.claude\skills"
-if "%assist_choice%"=="2" set "TARGET_DIR=.cursor\skills"
-if "%assist_choice%"=="3" set "TARGET_DIR=.gemini\skills"
-if "%assist_choice%"=="4" set "TARGET_DIR=.pi\skills"
-if "%assist_choice%"=="5" set "TARGET_DIR=.codex\skills"
-if "%assist_choice%"=="6" set "TARGET_DIR=.agent\skills"
-if "%assist_choice%"=="7" set "TARGET_DIR=.github\skills"
-if "%assist_choice%"=="8" set "TARGET_DIR=.windsurf\skills"
-if "%assist_choice%"=="9" set "TARGET_DIR=.augment\skills"
-if "%assist_choice%"=="10" set "TARGET_DIR=.agents\skills"
-if "%assist_choice%"=="11" set "TARGET_DIR=.bolt\skills"
+# Выбор скилов для установки
+$selectedSkills = @()
+if ($AllSkills) {
+    $selectedSkills = $availableSkills
+    Write-Success "Выбраны все скилы"
+} else {
+    Write-Host ""
+    Write-Host "Доступные скилы:" -ForegroundColor "White"
+    for ($i = 0; $i -lt $availableSkills.Count; $i++) {
+        Write-Host "  $($i+1)) $($availableSkills[$i])"
+    }
+    $inputChoice = Read-Host "Введите номера через запятую (например: 1,3,5) или 'all' для всех"
+    if ($inputChoice -eq "all") {
+        $selectedSkills = $availableSkills
+    } else {
+        $indices = $inputChoice -split ',' | ForEach-Object { $_.Trim() }
+        foreach ($idx in $indices) {
+            if ($idx -match '^\d+$' -and [int]$idx -ge 1 -and [int]$idx -le $availableSkills.Count) {
+                $selectedSkills += $availableSkills[[int]$idx - 1]
+            } else {
+                Write-Warning "Некорректный номер: $idx — пропускаем"
+            }
+        }
+    }
+}
 
-if "%assist_choice%"=="12" (
-    set /p "TARGET_DIR=Введите путь (например: .my-skills): "
-)
+if ($selectedSkills.Count -eq 0) {
+    Write-Error "Не выбрано ни одного скила для установки."
+}
 
-if "%TARGET_DIR%"=="" (
-    echo Неверный выбор.
-    rmdir /s /q "%TEMP_DIR%" 2>nul
-    pause
-    exit /b 1
-)
+Write-Success "Установка $($selectedSkills.Count) скилов в $TargetDir ..."
+$copied = 0
+foreach ($skill in $selectedSkills) {
+    $src = Join-Path $skillsSrc $skill
+    $dest = Join-Path $fullTarget $skill
+    if (Test-Path $src) {
+        if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+        Copy-Item -Path $src -Destination $dest -Recurse -Force
+        if (Test-Path (Join-Path $dest "SKILL.md")) {
+            Write-Success "  ✓ $skill"
+            $copied++
+        } else {
+            Write-Warning "  ✗ $skill — скопировано, но SKILL.md отсутствует"
+        }
+    } else {
+        Write-Warning "  ✗ $skill — исходная папка не найдена"
+    }
+}
 
-:: Создаём целевую папку в текущем проекте
-set "FULL_TARGET=%CURRENT_DIR%\%TARGET_DIR%"
-mkdir "%FULL_TARGET%" 2>nul
+Write-Host ""
+Write-Success "Готово! Установлено скилов: $copied"
+Write-Info "Скилы установлены в: $fullTarget"
 
-echo.
-echo Устанавливаем скилы в %FULL_TARGET%...
-
-:: Копируем все скилы (можно позже добавить выбор конкретных)
-:: Для простоты копируем всё. Если нужен выбор по номерам — допишу.
-for /d %%d in ("%SKILLS_SRC%\*") do (
-    if exist "%%d\SKILL.md" (
-        set "SK_NAME=%%~nxd"
-        set "DEST_DIR=%FULL_TARGET%\!SK_NAME!"
-        if exist "!DEST_DIR!" rmdir /s /q "!DEST_DIR!" 2>nul
-        xcopy "%%d" "!DEST_DIR!" /E /I /Q >nul
-        echo   [OK] !SK_NAME!
-    )
-)
-
-echo.
-echo [ГОТОВО] Скилы установлены в %TARGET_DIR%
-echo Теперь ваш AI-ассистент сможет их использовать.
-
-:: Очистка
-rmdir /s /q "%TEMP_DIR%" 2>nul
-
-echo.
-pause
+# Очистка
+Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
