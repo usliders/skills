@@ -1,115 +1,95 @@
-# Agent Skills For Real Engineers
+# AI Skills Collection / Коллекция скилов для AI-ассистентов
 
-My agent skills that I use every day to do real engineering - not vibe coding.
+[![GitHub license](https://img.shields.io/github/license/usliders/skills)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/usliders/skills)](https://github.com/usliders/skills/stargazers)
 
-If you want to keep up with changes to these skills, and any new ones I create, you can join ~60,000 other devs on my newsletter:
+Набор готовых инструкций (скилов) для AI-ассистентов: Claude Code, Cursor, Gemini, GitHub Copilot, Pi, Windsurf и других.  
+A collection of ready-to-use skills for AI assistants: Claude Code, Cursor, Gemini, GitHub Copilot, Pi, Windsurf and others.
 
-[Sign Up To The Newsletter](https://www.aihero.dev/s/skills-newsletter)
+## 🚀 Быстрый старт / Quick Start
 
-## Planning & Design
+### Windows (PowerShell)
 
-These skills help you think through problems before writing code.
+Одна команда — всё само установится (Git будет найден или предложен к установке):
 
-- **to-prd** — Turn the current conversation context into a PRD and submit it as a GitHub issue. No interview — just synthesizes what you've already discussed.
+```powershell
+iex (iwr -Uri 'https://raw.githubusercontent.com/usliders/skills/main/install.ps1' -UseBasicParsing).Content
+```
 
-  ```
-  npx skills@latest add mattpocock/skills/to-prd
-  ```
+### Linux / macOS / Git Bash (WSL)
 
-- **to-issues** — Break any plan, spec, or PRD into independently-grabbable GitHub issues using vertical slices.
+```bash
+bash <(curl -s https://raw.githubusercontent.com/usliders/skills/main/install.sh)
+```
 
-  ```
-  npx skills@latest add mattpocock/skills/to-issues
-  ```
+### Альтернатива для Windows (cmd)
 
-- **grill-me** — Get relentlessly interviewed about a plan or design until every branch of the decision tree is resolved.
+```cmd
+curl -sL https://raw.githubusercontent.com/usliders/skills/main/install-ps.bat -o %temp%\install.bat && %temp%\install.bat
+```
 
-  ```
-  npx skills@latest add mattpocock/skills/grill-me
-  ```
+📖 **Что делает скрипт? / What does the script do?**
 
-- **design-an-interface** — Generate multiple radically different interface designs for a module using parallel sub-agents.
+- Проверяет наличие Git (при необходимости находит его в стандартных папках или предлагает установить через winget)
+- Клонирует репозиторий usliders/skills во временную папку
+- Показывает список доступных скилов (все папки с файлом SKILL.md)
+- Предлагает выбрать AI-ассистента — от этого зависит целевая папка (.claude/skills, .cursor/skills и т.д.)
+- Копирует выбранные скилы в текущий проект
+- Автоматически удаляет временные файлы
 
-  ```
-  npx skills@latest add mattpocock/skills/design-an-interface
-  ```
+After installation, your AI assistant can use these skills (e.g. /skills in Claude Code).
 
-- **request-refactor-plan** — Create a detailed refactor plan with tiny commits via user interview, then file it as a GitHub issue.
+## 🛠 Ручная установка / Manual installation
 
-  ```
-  npx skills@latest add mattpocock/skills/request-refactor-plan
-  ```
+```bash
+git clone https://github.com/usliders/skills.git
+cd skills
+# Copy desired folders (e.g. to-prd) into your AI assistant's target directory
+```
 
-## Development
+| AI Assistant | Default folder |
+|-------------|---------------|
+| Claude Code | .claude/skills |
+| Cursor | .cursor/skills |
+| Gemini CLI | .gemini/skills |
+| Pi | .pi/skills |
+| Codex CLI | .codex/skills |
+| Antigravity | .agent/skills |
+| GitHub Copilot | .github/skills |
+| Windsurf Cascade | .windsurf/skills |
+| Augment Code | .augment/skills |
+| BoltAI | .bolt/skills |
+| Universal | .agents/skills |
 
-These skills help you write, refactor, and fix code.
+## 📚 Доступные скилы / Available skills
 
-- **tdd** — Test-driven development with a red-green-refactor loop. Builds features or fixes bugs one vertical slice at a time.
+- **to-prd** — превращение идеи в PRD / product requirements
+- **tdd** — Test-Driven Development пошаговые инструкции
+- **git-guardrails-claude-code** — безопасная работа с Git / safe Git usage
+- **refactoring** — рефакторинг / refactoring
+- **debugging** — отладка / debugging
+- и другие / and more
 
-  ```
-  npx skills@latest add mattpocock/skills/tdd
-  ```
+## ❓ Частые вопросы / FAQ
 
-- **triage-issue** — Investigate a bug by exploring the codebase, identify the root cause, and file a GitHub issue with a TDD-based fix plan.
+### Нужно ли платить? / Is paid?
+Нет, MIT license. / No, MIT license.
 
-  ```
-  npx skills@latest add mattpocock/skills/triage-issue
-  ```
+### Как обновить? / How to update?
+Запустите скрипт повторно. / Run the script again.
 
-- **improve-codebase-architecture** — Find deepening opportunities in a codebase, informed by the domain language in `CONTEXT.md` and the decisions in `docs/adr/`.
+### Могу ли добавить свои скилы? / Can I add my own skills?
+Да, форкните репозиторий. / Yes, fork the repo.
 
-  ```
-  npx skills@latest add mattpocock/skills/improve-codebase-architecture
-  ```
+### Работает с GPT-4 / Copilot Chat?
+Skills designed for agents supporting SKILL.md. For plain ChatGPT you can copy instructions manually.
 
-- **migrate-to-shoehorn** — Migrate test files from `as` type assertions to @total-typescript/shoehorn.
+## 🔗 Ссылки / Links
 
-  ```
-  npx skills@latest add mattpocock/skills/migrate-to-shoehorn
-  ```
+- Original source: [mattpocock/skills](https://github.com/mattpocock/skills)
+- Claude Code docs: [anthropic.com/claude-code](https://www.anthropic.com/claude-code)
+- Cursor docs: [cursor.sh](https://cursor.sh)
 
-- **scaffold-exercises** — Create exercise directory structures with sections, problems, solutions, and explainers.
+## 📄 Лицензия / License
 
-  ```
-  npx skills@latest add mattpocock/skills/scaffold-exercises
-  ```
-
-## Tooling & Setup
-
-- **setup-pre-commit** — Set up Husky pre-commit hooks with lint-staged, Prettier, type checking, and tests.
-
-  ```
-  npx skills@latest add mattpocock/skills/setup-pre-commit
-  ```
-
-- **git-guardrails-claude-code** — Set up Claude Code hooks to block dangerous git commands (push, reset --hard, clean, etc.) before they execute.
-
-  ```
-  npx skills@latest add mattpocock/skills/git-guardrails-claude-code
-  ```
-
-## Writing & Knowledge
-
-- **write-a-skill** — Create new skills with proper structure, progressive disclosure, and bundled resources.
-
-  ```
-  npx skills@latest add mattpocock/skills/write-a-skill
-  ```
-
-- **edit-article** — Edit and improve articles by restructuring sections, improving clarity, and tightening prose.
-
-  ```
-  npx skills@latest add mattpocock/skills/edit-article
-  ```
-
-- **ubiquitous-language** — Extract a DDD-style ubiquitous language glossary from the current conversation.
-
-  ```
-  npx skills@latest add mattpocock/skills/ubiquitous-language
-  ```
-
-- **obsidian-vault** — Search, create, and manage notes in an Obsidian vault with wikilinks and index notes.
-
-  ```
-  npx skills@latest add mattpocock/skills/obsidian-vault
-  ```
+MIT © usliders
