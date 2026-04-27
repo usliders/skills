@@ -1,5 +1,14 @@
 #!/usr/bin/env pwsh
-# install.ps1 - Установка скилов из usliders/skills в текущий проект
+<#
+.SYNOPSIS
+    Установка скилов из репозитория usliders/skills в текущий проект.
+.DESCRIPTION
+    Скрипт проверяет наличие Git, при необходимости находит его в стандартных папках
+    или предлагает автоматическую установку через winget. Затем клонирует репозиторий,
+    предлагает выбрать AI-ассистента и установить нужные скилы.
+.EXAMPLE
+    iex (iwr -Uri 'https://raw.githubusercontent.com/usliders/skills/main/install.ps1' -UseBasicParsing).Content
+#>
 
 param(
     [string]$RepoUrl = "https://github.com/usliders/skills.git",
@@ -8,7 +17,7 @@ param(
     [switch]$AllSkills
 )
 
-# Цвета для вывода (работает в Windows Terminal / PSReadLine)
+# Цвета и стили
 $InfoColor = "Cyan"
 $SuccessColor = "Green"
 $WarnColor = "Yellow"
@@ -19,31 +28,111 @@ function Write-Success{ Write-Host "[OK]   $args" -ForegroundColor $SuccessColor
 function Write-Warning{ Write-Host "[WARN] $args" -ForegroundColor $WarnColor }
 function Write-Error  { Write-Host "[ERROR] $args" -ForegroundColor $ErrorColor; exit 1 }
 
-# Проверка наличия git
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    Write-Error "Git не найден в PATH. Установите Git для Windows: https://git-scm.com/download/win"
+# ============================================================
+# 1. Обеспечение наличия Git
+# ============================================================
+function Find-GitManually {
+    # Возможные пути установки Git в Windows
+    $possiblePaths = @(
+        "C:\Program Files\Git\bin\git.exe",
+        "C:\Program Files (x86)\Git\bin\git.exe",
+        "$env:ProgramFiles\Git\bin\git.exe",
+        "${env:ProgramFiles(x86)}\Git\bin\git.exe",
+        "$env:LOCALAPPDATA\Programs\Git\bin\git.exe"
+    )
+    foreach ($path in $possiblePaths) {
+        if (Test-Path $path) {
+            $gitDir = Split-Path $path
+            # Добавляем в PATH текущей сессии
+            $env:Path = "$gitDir;$env:Path"
+            Write-Success "Найден Git по пути: $path (добавлен в PATH сессии)"
+            return $true
+        }
+    }
+    return $false
 }
 
-# Создание временной папки
-$tempDir = Join-Path $env:TEMP "skills-$([System.IO.Path]::GetRandomFileName())"
+function Ensure-Git {
+    # Если git уже доступен
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Write-Success "Git найден: $(git --version)"
+        return $true
+    }
+
+    # Попробуем найти вручную в стандартных папках
+    Write-Warning "Git не найден в PATH. Пытаюсь найти в стандартных папках..."
+    if (Find-GitManually) {
+        if (Get-Command git -ErrorAction SilentlyContinue) {
+            return $true
+        }
+    }
+
+    # Если не нашли — предлагаем установить
+    Write-Warning "Git не установлен или не найден."
+    $response = Read-Host "Хотите автоматически установить Git через winget? (y/n, потребует прав администратора)"
+    if ($response -ne 'y') {
+        Write-Error "Установите Git вручную: https://git-scm.com/download/win"
+    }
+
+    # Проверка прав администратора
+    $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+    if (-not $isAdmin) {
+        Write-Warning "Требуются права администратора. Перезапускаем скрипт с повышенными правами..."
+        # Определяем путь к текущему скрипту (если запущен через iex, скачиваем)
+        $tempScript = Join-Path $env:TEMP "install-skills.ps1"
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/usliders/skills/main/install.ps1" -OutFile $tempScript -UseBasicParsing
+        Start-Process powershell.exe -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$tempScript`" -RepoUrl `"$RepoUrl`" -Branch `"$Branch`" -TargetDir `"$TargetDir`" -AllSkills:`$$AllSkills"
+        exit 0
+    }
+
+    # Установка через winget
+    Write-Info "Устанавливаю Git через winget..."
+    try {
+        winget install --id Git.Git -e --silent --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -eq 0) {
+            # Обновляем PATH текущей сессии
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+            if (Get-Command git -ErrorAction SilentlyContinue) {
+                Write-Success "Git успешно установлен!"
+                return $true
+            } else {
+                Write-Error "Git установлен, но не добавлен в PATH. Перезапустите PowerShell и выполните скрипт снова."
+            }
+        } else {
+            Write-Error "Не удалось установить Git через winget (код $LASTEXITCODE). Установите вручную: https://git-scm.com/download/win"
+        }
+    } catch {
+        Write-Error "Ошибка при запуске winget: $_`nУстановите Git вручную: https://git-scm.com/download/win"
+    }
+}
+
+# Выполняем проверку Git
+Ensure-Git
+
+# ============================================================
+# 2. Клонирование репозитория и получение списка скилов
+# ============================================================
 Write-Info "Клонируем репозиторий $RepoUrl (ветка $Branch)..."
+$tempDir = Join-Path $env:TEMP "skills-$([System.IO.Path]::GetRandomFileName())"
 git clone --depth 1 --branch $Branch $RepoUrl $tempDir 2>$null
 if (-not (Test-Path (Join-Path $tempDir ".git"))) {
-    Write-Error "Не удалось клонировать репозиторий. Проверьте URL и интернет."
+    Write-Error "Не удалось клонировать репозиторий. Проверьте интернет и URL."
 }
 
-# Определяем папку со скилами
+# Определяем папку со скилами (либо корень, либо /skills)
 $skillsSrc = if (Test-Path (Join-Path $tempDir "skills")) { Join-Path $tempDir "skills" } else { $tempDir }
 
-# Получаем список скилов (папки с SKILL.md)
+# Собираем список доступных скилов (папки, содержащие SKILL.md)
 $availableSkills = Get-ChildItem $skillsSrc -Directory | Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") } | ForEach-Object { $_.Name } | Sort-Object
 if ($availableSkills.Count -eq 0) {
-    Write-Error "В репозитории не найдено ни одного скила (SKILL.md)."
+    Write-Error "В репозитории не найдено ни одного скила (отсутствуют папки с SKILL.md)."
 }
 
 Write-Info "Найдено скилов: $($availableSkills.Count)"
 
-# Интерактивный выбор AI-ассистента, если TargetDir не задан
+# ============================================================
+# 3. Выбор AI-ассистента (целевой папки)
+# ============================================================
 if ([string]::IsNullOrEmpty($TargetDir)) {
     Write-Host ""
     Write-Host "Выберите AI-ассистента (путь для установки скилов):" -ForegroundColor "White"
@@ -80,12 +169,14 @@ if ([string]::IsNullOrEmpty($TargetDir)) {
     }
 }
 
-# Целевая папка в текущем проекте
+# Создаём целевую папку в текущем проекте
 $fullTarget = Join-Path (Get-Location) $TargetDir
 New-Item -ItemType Directory -Path $fullTarget -Force | Out-Null
 Write-Info "Целевая папка: $fullTarget"
 
-# Выбор скилов для установки
+# ============================================================
+# 4. Выбор скилов для установки
+# ============================================================
 $selectedSkills = @()
 if ($AllSkills) {
     $selectedSkills = $availableSkills
@@ -115,13 +206,16 @@ if ($selectedSkills.Count -eq 0) {
     Write-Error "Не выбрано ни одного скила для установки."
 }
 
+# ============================================================
+# 5. Копирование выбранных скилов
+# ============================================================
 Write-Success "Установка $($selectedSkills.Count) скилов в $TargetDir ..."
 $copied = 0
 foreach ($skill in $selectedSkills) {
     $src = Join-Path $skillsSrc $skill
     $dest = Join-Path $fullTarget $skill
     if (Test-Path $src) {
-        if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+        if (Test-Path $dest) { Remove-Item $dest -Recurse -Force -ErrorAction SilentlyContinue }
         Copy-Item -Path $src -Destination $dest -Recurse -Force
         if (Test-Path (Join-Path $dest "SKILL.md")) {
             Write-Success "  ✓ $skill"
@@ -134,9 +228,12 @@ foreach ($skill in $selectedSkills) {
     }
 }
 
+# ============================================================
+# 6. Завершение
+# ============================================================
 Write-Host ""
 Write-Success "Готово! Установлено скилов: $copied"
 Write-Info "Скилы установлены в: $fullTarget"
 
-# Очистка
+# Очистка временных файлов
 Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
